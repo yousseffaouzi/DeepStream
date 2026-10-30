@@ -17,6 +17,11 @@
 
 #include "probedoc.h"
 
+static void report_unraisable_probe_exception(py::error_already_set& error, const char* context) {
+    py::gil_scoped_acquire gil;
+    error.discard_as_unraisable(context);
+}
+
 class BufferObserver_ : public BufferProbe::IBufferObserver {
 public:
     probeReturn handleBuffer(BufferProbe& probe, const Buffer& buffer) override {
@@ -51,13 +56,18 @@ public:
 
 class PyBufferOperator : public BufferOperator_ {
     virtual bool handle_buffer(Buffer buffer) {
-        PYBIND11_OVERRIDE_PURE_NAME(
-            bool,
-            BufferOperator_,
-            "handle_buffer",
-            handle_buffer,
-            buffer
-        );
+        try {
+            PYBIND11_OVERRIDE_PURE_NAME(
+                bool,
+                BufferOperator_,
+                "handle_buffer",
+                handle_buffer,
+                buffer
+            );
+        } catch (py::error_already_set& error) {
+            report_unraisable_probe_exception(error, "BufferOperator.handle_buffer");
+            return true;
+        }
     }
 };
 
@@ -84,13 +94,17 @@ protected:
 
 class PyBatchMetadataOperator : public BatchMetadataOperator_ {
     virtual void handle_metadata(BatchMetadata& metadata) {
-        PYBIND11_OVERRIDE_PURE_NAME(
-            void,
-            BatchMetadataOperator_,
-            "handle_metadata",
-            handle_metadata,
-            metadata
-        );
+        try {
+            PYBIND11_OVERRIDE_PURE_NAME(
+                void,
+                BatchMetadataOperator_,
+                "handle_metadata",
+                handle_metadata,
+                metadata
+            );
+        } catch (py::error_already_set& error) {
+            report_unraisable_probe_exception(error, "BatchMetadataOperator.handle_metadata");
+        }
     }
 
 };
